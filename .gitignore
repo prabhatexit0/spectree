@@ -7,6 +7,8 @@
 /ui/dist/
 /ui/.vite/
 /ui/package-lock.json
+/ui/public/parsers/*.wasm
+/ui/public/tree-sitter.wasm
 
 # Environment files
 .env
