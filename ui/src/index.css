@@ -25,3 +25,20 @@ body {
   height: 100vh;
   width: 100vw;
 }
+
+/* CodeMirror AST highlight decoration */
+.cm-highlight-ast {
+  background-color: rgba(250, 204, 21, 0.3);
+  border-radius: 2px;
+}
+
+/* Tree node at cursor position */
+.ast-node-at-cursor {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-left: 2px solid rgba(59, 130, 246, 0.8);
+}
+
+/* Tree node hover state */
+.ast-node-hovered {
+  background-color: rgba(250, 204, 21, 0.15);
+}
