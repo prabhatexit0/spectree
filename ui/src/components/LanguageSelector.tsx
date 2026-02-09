@@ -68,15 +68,15 @@ export function LanguageSelector({ value, onChange, isMobile }: LanguageSelector
             <>
                 <button
                     onClick={() => setIsOpen(true)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-lg active:bg-white/20 transition-colors min-h-[44px]"
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-white/[0.08] border border-white/[0.1] rounded-full active:bg-white/15 transition-colors"
                 >
                     {selectedLanguage && (
                         <>
-                            <selectedLanguage.icon className="w-4 h-4 text-blue-400" />
+                            <selectedLanguage.icon className="w-3.5 h-3.5 text-blue-400" />
                             <span className="font-medium">{selectedLanguage.label}</span>
                         </>
                     )}
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className="w-3 h-3 text-gray-400" />
                 </button>
 
                 {isOpen && (
