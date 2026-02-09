@@ -9,6 +9,7 @@ import { go } from '@codemirror/lang-go';
 import { StreamLanguage } from '@codemirror/language';
 import { parser, type AstNode, type ParseResult } from './lib/parser';
 import { LanguageSelector } from './components/LanguageSelector';
+import { BottomSheet, type SnapPoint } from './components/BottomSheet';
 import {
   cursorPositionTracker,
   highlightExtension,
@@ -166,8 +167,6 @@ function useIsMobile() {
   return isMobile;
 }
 
-type ActivePanel = 'code' | 'ast';
-
 function App() {
   const [code, setCode] = useState(SAMPLE_CODE.rust);
   const [language, setLanguage] = useState('rust');
@@ -177,7 +176,7 @@ function App() {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [cursorNodePath, setCursorNodePath] = useState<string | null>(null);
   const [hoveredNodePath, setHoveredNodePath] = useState<string | null>(null);
-  const [activePanel, setActivePanel] = useState<ActivePanel>('code');
+  const [astSnap, setAstSnap] = useState<SnapPoint>('collapsed');
 
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const cursorDebounceRef = useRef<number | null>(null);
@@ -522,45 +521,106 @@ function App() {
     return null;
   };
 
+  // ============================================
+  // Mobile Layout
+  // ============================================
+  if (isMobile) {
+    return (
+      <div className="h-full flex flex-col bg-[#0f0f0f] text-white">
+        {/* Mobile header: language selector */}
+        <div
+          className="mobile-header flex items-center justify-between px-3 py-2 border-b border-white/10 bg-[#161616]"
+          style={{ paddingTop: `max(8px, var(--safe-area-top))` }}
+        >
+          <span className="text-sm font-medium text-gray-300 truncate">TreeHouse</span>
+          <LanguageSelector value={language} onChange={handleLanguageChange} isMobile />
+        </div>
+
+        {/* Code editor fills remaining space */}
+        <div className="flex-1 overflow-hidden relative">
+          <CodeMirror
+            ref={editorRef}
+            value={code}
+            height="100%"
+            theme={vscodeDark}
+            extensions={[
+              languageExtension,
+              highlightExtension(),
+              cursorTrackerExtension,
+            ]}
+            onChange={handleCodeChange}
+            basicSetup={{
+              lineNumbers: true,
+              highlightActiveLineGutter: true,
+              highlightActiveLine: true,
+              foldGutter: false,
+              dropCursor: true,
+              allowMultipleSelections: false,
+              indentOnInput: true,
+              bracketMatching: true,
+              closeBrackets: true,
+              autocompletion: false,
+              rectangularSelection: false,
+              crosshairCursor: false,
+              highlightSelectionMatches: true,
+            }}
+            style={{ height: '100%', fontSize: '14px' }}
+          />
+        </div>
+
+        {/* AST Bottom Sheet */}
+        <BottomSheet
+          snap={astSnap}
+          onSnapChange={setAstSnap}
+          header={
+            <div className="flex items-center justify-between w-full px-4">
+              <span className="text-sm font-medium text-gray-300">
+                AST Tree
+                {parseResult?.ast && (
+                  <span className="text-xs text-gray-500 ml-2">
+                    {countNodes(parseResult.ast)} nodes
+                  </span>
+                )}
+              </span>
+              {parseResult?.ast && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={expandAll}
+                    className="text-xs px-2 py-1 rounded bg-white/10 active:bg-white/20 transition-colors"
+                  >
+                    Expand
+                  </button>
+                  <button
+                    onClick={collapseAll}
+                    className="text-xs px-2 py-1 rounded bg-white/10 active:bg-white/20 transition-colors"
+                  >
+                    Collapse
+                  </button>
+                </div>
+              )}
+            </div>
+          }
+        >
+          <div className="flex-1 overflow-auto p-3 hide-scrollbar ast-tree">
+            {renderAstContent()}
+          </div>
+        </BottomSheet>
+      </div>
+    );
+  }
+
+  // ============================================
+  // Desktop Layout
+  // ============================================
   return (
     <div className="h-full flex flex-col bg-[#0f0f0f] text-white">
-      {/* Mobile Tab Bar */}
-      <div className="md:hidden flex border-b border-white/10 bg-white/5">
-        <button
-          className={`mobile-tab flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-            activePanel === 'code' ? 'active text-blue-400' : 'text-gray-400'
-          }`}
-          onClick={() => setActivePanel('code')}
-        >
-          Source Code
-        </button>
-        <button
-          className={`mobile-tab flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-            activePanel === 'ast' ? 'active text-blue-400' : 'text-gray-400'
-          }`}
-          onClick={() => setActivePanel('ast')}
-        >
-          AST Tree
-        </button>
-      </div>
-
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
-        {/* Editor Panel - always rendered but hidden on mobile when AST tab is active */}
-        <div className={`flex flex-col border-r border-white/10 md:w-1/2 ${
-          isMobile && activePanel !== 'code' ? 'hidden' : 'flex-1 md:flex-none'
-        }`}>
+        {/* Editor Panel */}
+        <div className="flex flex-col border-r border-white/10 md:w-1/2">
           {/* Desktop header */}
-          <div className="hidden md:flex px-4 py-2 border-b border-white/10 bg-white/5 items-center justify-between h-[50px]">
+          <div className="flex px-4 py-2 border-b border-white/10 bg-white/5 items-center justify-between h-[50px]">
             <span className="text-sm font-medium text-gray-400">Source Code</span>
-            <LanguageSelector value={language} onChange={handleLanguageChange} />
-          </div>
-          {/* Mobile header */}
-          <div
-            className="md:hidden px-3 py-2 border-b border-white/10 bg-white/5 flex items-center justify-between"
-            style={{ paddingTop: `max(8px, var(--safe-area-top))` }}
-          >
-            <span className="text-xs text-gray-500">Language:</span>
             <LanguageSelector value={language} onChange={handleLanguageChange} />
           </div>
           <div className="flex-1 overflow-hidden">
@@ -579,14 +639,14 @@ function App() {
                 lineNumbers: true,
                 highlightActiveLineGutter: true,
                 highlightActiveLine: true,
-                foldGutter: !isMobile,
+                foldGutter: true,
                 dropCursor: true,
-                allowMultipleSelections: !isMobile,
+                allowMultipleSelections: true,
                 indentOnInput: true,
                 bracketMatching: true,
                 closeBrackets: true,
-                autocompletion: !isMobile,
-                rectangularSelection: !isMobile,
+                autocompletion: true,
+                rectangularSelection: true,
                 crosshairCursor: false,
                 highlightSelectionMatches: true,
               }}
@@ -595,12 +655,10 @@ function App() {
           </div>
         </div>
 
-        {/* AST Panel - always rendered but hidden on mobile when code tab is active */}
-        <div className={`flex flex-col md:w-1/2 ${
-          isMobile && activePanel !== 'ast' ? 'hidden' : 'flex-1 md:flex-none'
-        }`}>
+        {/* AST Panel */}
+        <div className="flex flex-col md:w-1/2">
           {/* Desktop header */}
-          <div className="hidden md:flex px-4 py-2 border-b border-white/10 bg-white/5 items-center justify-between h-[50px]">
+          <div className="flex px-4 py-2 border-b border-white/10 bg-white/5 items-center justify-between h-[50px]">
             <span className="text-sm font-medium text-gray-400">Abstract Syntax Tree</span>
             {parseResult?.ast && (
               <div className="flex gap-2">
@@ -613,28 +671,6 @@ function App() {
                 <button
                   onClick={collapseAll}
                   className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 transition-colors"
-                >
-                  Collapse All
-                </button>
-              </div>
-            )}
-          </div>
-          {/* Mobile header */}
-          <div
-            className="md:hidden px-3 py-2 border-b border-white/10 bg-white/5 flex items-center justify-between"
-            style={{ paddingTop: `max(8px, var(--safe-area-top))` }}
-          >
-            {parseResult?.ast && (
-              <div className="flex gap-2 w-full">
-                <button
-                  onClick={expandAll}
-                  className="flex-1 text-xs px-3 py-2 rounded bg-white/10 active:bg-white/20 transition-colors min-h-[36px]"
-                >
-                  Expand All
-                </button>
-                <button
-                  onClick={collapseAll}
-                  className="flex-1 text-xs px-3 py-2 rounded bg-white/10 active:bg-white/20 transition-colors min-h-[36px]"
                 >
                   Collapse All
                 </button>
