@@ -1,14 +1,17 @@
 import { useRef, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { ChevronUp } from 'lucide-react';
 
 export type SnapPoint = 'collapsed' | 'half' | 'full';
 
-const COLLAPSED_HEIGHT = 48; // Just the handle bar
 const HALF_RATIO = 0.5;
 const FULL_RATIO = 0.92;
+// Minimum height when dragging (the sheet handle + header)
+const MIN_DRAG_HEIGHT = 60;
 
 interface BottomSheetProps {
   children: ReactNode;
   header?: ReactNode;
+  collapsedLabel?: string;
   snap: SnapPoint;
   onSnapChange: (snap: SnapPoint) => void;
 }
@@ -16,7 +19,7 @@ interface BottomSheetProps {
 function getSnapHeight(snap: SnapPoint, windowHeight: number): number {
   switch (snap) {
     case 'collapsed':
-      return COLLAPSED_HEIGHT;
+      return 0; // Not used for rendering, collapsed uses the pill
     case 'half':
       return Math.round(windowHeight * HALF_RATIO);
     case 'full':
@@ -25,20 +28,20 @@ function getSnapHeight(snap: SnapPoint, windowHeight: number): number {
 }
 
 function nearestSnap(height: number, windowHeight: number): SnapPoint {
-  const collapsed = COLLAPSED_HEIGHT;
   const half = windowHeight * HALF_RATIO;
   const full = windowHeight * FULL_RATIO;
 
-  const distCollapsed = Math.abs(height - collapsed);
+  // If dragged below 15% of screen, collapse
+  if (height < windowHeight * 0.15) return 'collapsed';
+
   const distHalf = Math.abs(height - half);
   const distFull = Math.abs(height - full);
 
-  if (distCollapsed <= distHalf && distCollapsed <= distFull) return 'collapsed';
   if (distHalf <= distFull) return 'half';
   return 'full';
 }
 
-export function BottomSheet({ children, header, snap, onSnapChange }: BottomSheetProps) {
+export function BottomSheet({ children, header, collapsedLabel, snap, onSnapChange }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{
     startY: number;
@@ -46,7 +49,7 @@ export function BottomSheet({ children, header, snap, onSnapChange }: BottomShee
     moved: boolean;
   } | null>(null);
 
-  const [currentHeight, setCurrentHeight] = useState(COLLAPSED_HEIGHT);
+  const [currentHeight, setCurrentHeight] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [windowHeight, setWindowHeight] = useState(
     typeof window !== 'undefined' ? window.innerHeight : 800
@@ -91,7 +94,7 @@ export function BottomSheet({ children, header, snap, onSnapChange }: BottomShee
       }
 
       const newHeight = Math.max(
-        COLLAPSED_HEIGHT,
+        MIN_DRAG_HEIGHT,
         Math.min(dragState.current.startHeight + deltaY, windowHeight * FULL_RATIO)
       );
       setCurrentHeight(newHeight);
@@ -110,12 +113,27 @@ export function BottomSheet({ children, header, snap, onSnapChange }: BottomShee
     setIsDragging(false);
   }, [currentHeight, windowHeight, onSnapChange]);
 
-  // Tapping the handle toggles between collapsed and half
+  // Tapping the handle collapses if open
   const handleHandleTap = useCallback(() => {
     if (dragState.current?.moved) return;
-    const newSnap = snap === 'collapsed' ? 'half' : 'collapsed';
-    onSnapChange(newSnap);
-  }, [snap, onSnapChange]);
+    onSnapChange('collapsed');
+  }, [onSnapChange]);
+
+  // When collapsed, render a floating pill instead of a bottom bar
+  if (snap === 'collapsed' && !isDragging) {
+    return (
+      <button
+        className="bottom-sheet-pill"
+        onClick={() => onSnapChange('half')}
+        aria-label="Open AST viewer"
+      >
+        <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
+        <span className="text-xs font-medium text-gray-300">
+          {collapsedLabel || 'AST'}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <div

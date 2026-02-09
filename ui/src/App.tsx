@@ -601,19 +601,19 @@ function App() {
   if (isMobile) {
     return (
       <div className="h-full flex flex-col bg-[#1e1e1e] text-white">
-        {/* Mobile header: language selector + mode toggle */}
+        {/* Mobile header */}
         <div
-          className="mobile-header flex items-center justify-between px-3 py-2 border-b border-white/8 bg-[#252526]"
-          style={{ paddingTop: `max(8px, var(--safe-area-top))` }}
+          className="mobile-header flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06] bg-[#1e1e1e]/80 backdrop-blur-xl"
+          style={{ paddingTop: `max(10px, var(--safe-area-top))` }}
         >
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">SpecTree</span>
-          <div className="flex items-center gap-2">
-            <div className="editor-mode-toggle flex items-center bg-white/[0.06] rounded-md p-0.5">
+          <span className="text-sm font-semibold text-white/90 tracking-tight">spectree</span>
+          <div className="flex items-center gap-2.5">
+            <div className="editor-mode-toggle flex items-center bg-white/[0.08] rounded-full p-[3px]">
               <button
                 onClick={() => setEditorMode('explorer')}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   editorMode === 'explorer'
-                    ? 'bg-[#007acc] text-white'
+                    ? 'bg-[#007acc] text-white shadow-sm shadow-blue-500/30'
                     : 'text-gray-400 active:bg-white/10'
                 }`}
                 aria-label="Explorer mode"
@@ -623,9 +623,9 @@ function App() {
               </button>
               <button
                 onClick={() => setEditorMode('edit')}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   editorMode === 'edit'
-                    ? 'bg-[#007acc] text-white'
+                    ? 'bg-[#007acc] text-white shadow-sm shadow-blue-500/30'
                     : 'text-gray-400 active:bg-white/10'
                 }`}
                 aria-label="Edit mode"
@@ -634,6 +634,7 @@ function App() {
                 <span>Edit</span>
               </button>
             </div>
+            <div className="w-px h-5 bg-white/[0.08]" />
             <LanguageSelector value={language} onChange={handleLanguageChange} isMobile />
           </div>
         </div>
@@ -678,6 +679,7 @@ function App() {
         <BottomSheet
           snap={astSnap}
           onSnapChange={setAstSnap}
+          collapsedLabel={parseResult?.ast ? `AST \u00b7 ${countNodes(parseResult.ast)} nodes` : 'AST'}
           header={
             <div className="flex items-center justify-between w-full px-3">
               <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
@@ -720,17 +722,17 @@ function App() {
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
         {/* Editor Panel */}
-        <div className="flex flex-col border-r border-[#333] md:w-1/2">
+        <div className="flex flex-col border-r border-white/[0.06] md:w-1/2">
           {/* Desktop header */}
-          <div className="flex px-4 py-2 border-b border-[#333] bg-[#252526] items-center justify-between h-[36px]">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Source Code</span>
+          <div className="flex px-4 py-2 border-b border-white/[0.06] bg-[#1e1e1e] items-center justify-between h-[36px]">
+            <span className="text-xs font-semibold text-white/60 tracking-tight">Source Code</span>
             <div className="flex items-center gap-3">
-              <div className="editor-mode-toggle flex items-center bg-white/[0.06] rounded-md p-0.5">
+              <div className="editor-mode-toggle flex items-center bg-white/[0.08] rounded-full p-[3px]">
                 <button
                   onClick={() => setEditorMode('explorer')}
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium transition-all ${
                     editorMode === 'explorer'
-                      ? 'bg-[#007acc] text-white'
+                      ? 'bg-[#007acc] text-white shadow-sm shadow-blue-500/30'
                       : 'text-gray-500 hover:text-gray-300 hover:bg-white/10'
                   }`}
                   aria-label="Explorer mode"
@@ -740,9 +742,9 @@ function App() {
                 </button>
                 <button
                   onClick={() => setEditorMode('edit')}
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium transition-all ${
                     editorMode === 'edit'
-                      ? 'bg-[#007acc] text-white'
+                      ? 'bg-[#007acc] text-white shadow-sm shadow-blue-500/30'
                       : 'text-gray-500 hover:text-gray-300 hover:bg-white/10'
                   }`}
                   aria-label="Edit mode"
@@ -785,9 +787,9 @@ function App() {
         {/* AST Panel */}
         <div className="flex flex-col md:w-1/2 bg-[#1e1e1e]">
           {/* Desktop header */}
-          <div className="flex px-4 py-2 border-b border-[#333] bg-[#252526] items-center justify-between h-[36px]">
+          <div className="flex px-4 py-2 border-b border-white/[0.06] bg-[#1e1e1e] items-center justify-between h-[36px]">
             <div className="flex items-center gap-3">
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">AST</span>
+              <span className="text-xs font-semibold text-white/60 tracking-tight">AST</span>
               {parseResult?.ast && (
                 <span className="text-xs text-gray-600">
                   {countNodes(parseResult.ast)} nodes
@@ -820,9 +822,9 @@ function App() {
         </div>
       </div>
 
-      {/* Footer - VSCode-like status bar */}
+      {/* Footer - status bar */}
       <footer
-        className="px-4 py-1 border-t border-[#333] bg-[#007acc] text-xs text-white/90 flex justify-between items-center h-[22px]"
+        className="px-4 py-1 border-t border-blue-500/30 bg-[#007acc] text-xs text-white/90 flex justify-between items-center h-[22px]"
         style={{ paddingBottom: `max(4px, var(--safe-area-bottom))` }}
       >
         <span className="truncate">Tree-sitter WASM</span>
