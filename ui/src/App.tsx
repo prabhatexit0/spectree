@@ -33,7 +33,7 @@ type EditorMode = 'explorer' | 'edit';
 // Sample code for each language
 const SAMPLE_CODE: Record<string, string> = {
   json: `{
-  "name": "TreeHouse",
+  "name": "SpecTree",
   "version": "1.0.0",
   "features": ["parsing", "visualization"],
   "config": {
@@ -42,7 +42,7 @@ const SAMPLE_CODE: Record<string, string> = {
   }
 }`,
   rust: `fn main() {
-    let message = "Hello, AST (Welcome to TreeHouse)!";
+    let message = "Hello, AST (Welcome to SpecTree)!";
     println!("{}", message);
 
     for i in 0..5 {
@@ -606,7 +606,7 @@ function App() {
           className="mobile-header flex items-center justify-between px-3 py-2 border-b border-white/8 bg-[#252526]"
           style={{ paddingTop: `max(8px, var(--safe-area-top))` }}
         >
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">TreeHouse</span>
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">SpecTree</span>
           <div className="flex items-center gap-2">
             <div className="editor-mode-toggle flex items-center bg-white/[0.06] rounded-md p-0.5">
               <button
