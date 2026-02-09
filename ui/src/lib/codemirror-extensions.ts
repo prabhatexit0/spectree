@@ -99,6 +99,40 @@ export function setHighlight(view: EditorView, range: HighlightRange | null): vo
 }
 
 // ============================================
+// Explorer Mode Extension
+// ============================================
+
+/**
+ * Extension for explorer mode: makes the editor non-editable (prevents
+ * keyboard from opening on mobile) while still allowing taps/clicks
+ * to set cursor position for AST node highlighting.
+ */
+export function explorerModeExtension(): Extension {
+    return [
+        EditorView.editable.of(false),
+        EditorView.domEventHandlers({
+            mousedown(event, view) {
+                const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+                if (pos !== null) {
+                    view.dispatch({ selection: { anchor: pos } });
+                }
+                return false;
+            },
+            touchend(event, view) {
+                if (event.changedTouches.length > 0) {
+                    const touch = event.changedTouches[0];
+                    const pos = view.posAtCoords({ x: touch.clientX, y: touch.clientY });
+                    if (pos !== null) {
+                        view.dispatch({ selection: { anchor: pos } });
+                    }
+                }
+                return false;
+            },
+        }),
+    ];
+}
+
+// ============================================
 // Combined Extension Factory
 // ============================================
 

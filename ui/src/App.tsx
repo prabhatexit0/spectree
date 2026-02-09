@@ -13,6 +13,8 @@ import {
   UnfoldVertical,
   FoldVertical,
   Minus,
+  Eye,
+  Pencil,
 } from 'lucide-react';
 import { parser, type AstNode, type ParseResult } from './lib/parser';
 import { LanguageSelector } from './components/LanguageSelector';
@@ -21,8 +23,11 @@ import {
   cursorPositionTracker,
   highlightExtension,
   setHighlight,
+  explorerModeExtension,
   type CursorPosition,
 } from './lib/codemirror-extensions';
+
+type EditorMode = 'explorer' | 'edit';
 
 // Sample code for each language
 const SAMPLE_CODE: Record<string, string> = {
@@ -185,10 +190,19 @@ function App() {
   const [cursorNodePath, setCursorNodePath] = useState<string | null>(null);
   const [hoveredNodePath, setHoveredNodePath] = useState<string | null>(null);
   const [astSnap, setAstSnap] = useState<SnapPoint>('collapsed');
+  const [editorMode, setEditorMode] = useState<EditorMode>('explorer');
 
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const cursorDebounceRef = useRef<number | null>(null);
   const isMobile = useIsMobile();
+
+  // Switch editor mode, blurring editor when entering explorer to dismiss keyboard
+  const handleModeChange = useCallback((mode: EditorMode) => {
+    setEditorMode(mode);
+    if (mode === 'explorer' && editorRef.current?.view) {
+      editorRef.current.view.contentDOM.blur();
+    }
+  }, []);
 
   // Memoize language extension to prevent unnecessary re-renders
   const languageExtension = useMemo(
@@ -395,6 +409,12 @@ function App() {
     [handleCursorChange]
   );
 
+  // Explorer mode extension (non-editable + tap-to-highlight)
+  const explorerExt = useMemo(
+    () => (editorMode === 'explorer' ? explorerModeExtension() : []),
+    [editorMode]
+  );
+
   // Toggle expand/collapse all nodes
   const toggleExpandCollapseAll = () => {
     if (isAllExpanded) {
@@ -543,12 +563,35 @@ function App() {
   if (isMobile) {
     return (
       <div className="h-full flex flex-col bg-[#1e1e1e] text-white">
-        {/* Mobile header: language selector */}
+        {/* Mobile header: mode toggle + language selector */}
         <div
           className="mobile-header flex items-center justify-between px-3 py-2 border-b border-white/8 bg-[#252526]"
           style={{ paddingTop: `max(8px, var(--safe-area-top))` }}
         >
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">TreeHouse</span>
+          <div className="flex items-center gap-0.5 bg-white/5 rounded-md p-0.5">
+            <button
+              onClick={() => handleModeChange('explorer')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                editorMode === 'explorer'
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : 'text-gray-500 active:text-gray-400'
+              }`}
+            >
+              <Eye className="w-3 h-3" />
+              Explore
+            </button>
+            <button
+              onClick={() => handleModeChange('edit')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                editorMode === 'edit'
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : 'text-gray-500 active:text-gray-400'
+              }`}
+            >
+              <Pencil className="w-3 h-3" />
+              Edit
+            </button>
+          </div>
           <LanguageSelector value={language} onChange={handleLanguageChange} isMobile />
         </div>
 
@@ -563,8 +606,9 @@ function App() {
               languageExtension,
               highlightExtension(),
               cursorTrackerExtension,
+              explorerExt,
             ]}
-            onChange={handleCodeChange}
+            onChange={editorMode === 'edit' ? handleCodeChange : undefined}
             basicSetup={{
               lineNumbers: true,
               highlightActiveLineGutter: true,
@@ -633,7 +677,33 @@ function App() {
         <div className="flex flex-col border-r border-[#333] md:w-1/2">
           {/* Desktop header */}
           <div className="flex px-4 py-2 border-b border-[#333] bg-[#252526] items-center justify-between h-[36px]">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Source Code</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Source Code</span>
+              <div className="flex items-center gap-0.5 bg-white/5 rounded-md p-0.5">
+                <button
+                  onClick={() => handleModeChange('explorer')}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                    editorMode === 'explorer'
+                      ? 'bg-blue-500/20 text-blue-400'
+                      : 'text-gray-500 hover:text-gray-400'
+                  }`}
+                >
+                  <Eye className="w-3 h-3" />
+                  Explore
+                </button>
+                <button
+                  onClick={() => handleModeChange('edit')}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                    editorMode === 'edit'
+                      ? 'bg-blue-500/20 text-blue-400'
+                      : 'text-gray-500 hover:text-gray-400'
+                  }`}
+                >
+                  <Pencil className="w-3 h-3" />
+                  Edit
+                </button>
+              </div>
+            </div>
             <LanguageSelector value={language} onChange={handleLanguageChange} />
           </div>
           <div className="flex-1 overflow-hidden">
@@ -646,8 +716,9 @@ function App() {
                 languageExtension,
                 highlightExtension(),
                 cursorTrackerExtension,
+                explorerExt,
               ]}
-              onChange={handleCodeChange}
+              onChange={editorMode === 'edit' ? handleCodeChange : undefined}
               basicSetup={{
                 lineNumbers: true,
                 highlightActiveLineGutter: true,
@@ -658,8 +729,8 @@ function App() {
                 indentOnInput: true,
                 bracketMatching: true,
                 closeBrackets: true,
-                autocompletion: true,
-                rectangularSelection: true,
+                autocompletion: editorMode === 'edit',
+                rectangularSelection: editorMode === 'edit',
                 crosshairCursor: false,
                 highlightSelectionMatches: true,
               }}
