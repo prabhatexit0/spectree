@@ -13,16 +13,22 @@ import {
   UnfoldVertical,
   FoldVertical,
   Minus,
+  Search,
+  Pencil,
 } from 'lucide-react';
 import { parser, type AstNode, type ParseResult } from './lib/parser';
 import { LanguageSelector } from './components/LanguageSelector';
 import { BottomSheet, type SnapPoint } from './components/BottomSheet';
+import { EditorView } from '@codemirror/view';
 import {
   cursorPositionTracker,
   highlightExtension,
   setHighlight,
+  explorerClickHandler,
   type CursorPosition,
 } from './lib/codemirror-extensions';
+
+type EditorMode = 'explorer' | 'edit';
 
 // Sample code for each language
 const SAMPLE_CODE: Record<string, string> = {
@@ -185,6 +191,7 @@ function App() {
   const [cursorNodePath, setCursorNodePath] = useState<string | null>(null);
   const [hoveredNodePath, setHoveredNodePath] = useState<string | null>(null);
   const [astSnap, setAstSnap] = useState<SnapPoint>('collapsed');
+  const [editorMode, setEditorMode] = useState<EditorMode>('explorer');
 
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const cursorDebounceRef = useRef<number | null>(null);
@@ -355,10 +362,27 @@ function App() {
         if (nodePath && nodePath !== cursorNodePath) {
           setCursorNodePath(nodePath);
           expandPathToNode(nodePath);
+
+          // In explorer mode, highlight the matched node's range in the editor
+          if (editorMode === 'explorer') {
+            if (editorRef.current?.view) {
+              const node = getNodeByPath(parseResult.ast, nodePath);
+              if (node) {
+                setHighlight(editorRef.current.view, {
+                  from: node.start,
+                  to: node.end,
+                });
+              }
+            }
+            // On mobile, auto-open the bottom sheet so the AST node is visible
+            if (isMobile && astSnap === 'collapsed') {
+              setAstSnap('half');
+            }
+          }
         }
       }, 50);
     },
-    [parseResult?.ast, cursorNodePath, findNodeAtPosition, expandPathToNode]
+    [parseResult?.ast, cursorNodePath, findNodeAtPosition, expandPathToNode, editorMode, getNodeByPath, isMobile, astSnap]
   );
 
   // ============================================
@@ -389,11 +413,44 @@ function App() {
     }
   }, []);
 
+  // Auto-scroll AST tree to the node at cursor
+  useEffect(() => {
+    if (!cursorNodePath) return;
+
+    // Small delay to let the DOM update after expandPathToNode
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector(`[data-ast-path="${cursorNodePath}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 60);
+
+    return () => window.clearTimeout(timer);
+  }, [cursorNodePath]);
+
   // Create cursor tracker extension
   const cursorTrackerExtension = useMemo(
     () => cursorPositionTracker(handleCursorChange),
     [handleCursorChange]
   );
+
+  // Explorer mode: click handler for AST node finding when editor is non-editable
+  const explorerClickExtension = useMemo(
+    () => explorerClickHandler(handleCursorChange),
+    [handleCursorChange]
+  );
+
+  // Build editor extensions based on current mode
+  const editorExtensions = useMemo(() => {
+    const exts = [languageExtension, highlightExtension()];
+    if (editorMode === 'explorer') {
+      exts.push(EditorView.editable.of(false));
+      exts.push(explorerClickExtension);
+    } else {
+      exts.push(cursorTrackerExtension);
+    }
+    return exts;
+  }, [editorMode, languageExtension, cursorTrackerExtension, explorerClickExtension]);
 
   // Toggle expand/collapse all nodes
   const toggleExpandCollapseAll = () => {
@@ -439,6 +496,7 @@ function App() {
       <div key={path} className="select-none">
         <div
           className={rowClasses}
+          data-ast-path={path}
           style={{ paddingLeft: `${depth * (isMobile ? 12 : 16) + 8}px` }}
           onClick={() => {
             if (hasChildren) toggleNode(path);
@@ -543,13 +601,41 @@ function App() {
   if (isMobile) {
     return (
       <div className="h-full flex flex-col bg-[#1e1e1e] text-white">
-        {/* Mobile header: language selector */}
+        {/* Mobile header: language selector + mode toggle */}
         <div
           className="mobile-header flex items-center justify-between px-3 py-2 border-b border-white/8 bg-[#252526]"
           style={{ paddingTop: `max(8px, var(--safe-area-top))` }}
         >
           <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">TreeHouse</span>
-          <LanguageSelector value={language} onChange={handleLanguageChange} isMobile />
+          <div className="flex items-center gap-2">
+            <div className="editor-mode-toggle flex items-center bg-white/[0.06] rounded-md p-0.5">
+              <button
+                onClick={() => setEditorMode('explorer')}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  editorMode === 'explorer'
+                    ? 'bg-[#007acc] text-white'
+                    : 'text-gray-400 active:bg-white/10'
+                }`}
+                aria-label="Explorer mode"
+              >
+                <Search className="w-3 h-3" />
+                <span>Explore</span>
+              </button>
+              <button
+                onClick={() => setEditorMode('edit')}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  editorMode === 'edit'
+                    ? 'bg-[#007acc] text-white'
+                    : 'text-gray-400 active:bg-white/10'
+                }`}
+                aria-label="Edit mode"
+              >
+                <Pencil className="w-3 h-3" />
+                <span>Edit</span>
+              </button>
+            </div>
+            <LanguageSelector value={language} onChange={handleLanguageChange} isMobile />
+          </div>
         </div>
 
         {/* Code editor fills remaining space */}
@@ -559,29 +645,33 @@ function App() {
             value={code}
             height="100%"
             theme={vscodeDark}
-            extensions={[
-              languageExtension,
-              highlightExtension(),
-              cursorTrackerExtension,
-            ]}
-            onChange={handleCodeChange}
+            extensions={editorExtensions}
+            onChange={editorMode === 'edit' ? handleCodeChange : undefined}
             basicSetup={{
               lineNumbers: true,
-              highlightActiveLineGutter: true,
-              highlightActiveLine: true,
+              highlightActiveLineGutter: editorMode === 'edit',
+              highlightActiveLine: editorMode === 'edit',
               foldGutter: false,
-              dropCursor: true,
+              dropCursor: editorMode === 'edit',
               allowMultipleSelections: false,
-              indentOnInput: true,
-              bracketMatching: true,
-              closeBrackets: true,
+              indentOnInput: editorMode === 'edit',
+              bracketMatching: editorMode === 'edit',
+              closeBrackets: editorMode === 'edit',
               autocompletion: false,
               rectangularSelection: false,
               crosshairCursor: false,
-              highlightSelectionMatches: true,
+              highlightSelectionMatches: editorMode === 'edit',
             }}
             style={{ height: '100%', fontSize: '14px' }}
           />
+          {editorMode === 'explorer' && (
+            <div className="absolute bottom-3 left-3 right-3 flex justify-center pointer-events-none">
+              <div className="explorer-mode-hint flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm text-xs text-gray-300 border border-white/10">
+                <Search className="w-3 h-3" />
+                <span>Tap code to explore AST nodes</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* AST Bottom Sheet */}
@@ -634,34 +724,58 @@ function App() {
           {/* Desktop header */}
           <div className="flex px-4 py-2 border-b border-[#333] bg-[#252526] items-center justify-between h-[36px]">
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Source Code</span>
-            <LanguageSelector value={language} onChange={handleLanguageChange} />
+            <div className="flex items-center gap-3">
+              <div className="editor-mode-toggle flex items-center bg-white/[0.06] rounded-md p-0.5">
+                <button
+                  onClick={() => setEditorMode('explorer')}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                    editorMode === 'explorer'
+                      ? 'bg-[#007acc] text-white'
+                      : 'text-gray-500 hover:text-gray-300 hover:bg-white/10'
+                  }`}
+                  aria-label="Explorer mode"
+                >
+                  <Search className="w-3 h-3" />
+                  <span>Explore</span>
+                </button>
+                <button
+                  onClick={() => setEditorMode('edit')}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                    editorMode === 'edit'
+                      ? 'bg-[#007acc] text-white'
+                      : 'text-gray-500 hover:text-gray-300 hover:bg-white/10'
+                  }`}
+                  aria-label="Edit mode"
+                >
+                  <Pencil className="w-3 h-3" />
+                  <span>Edit</span>
+                </button>
+              </div>
+              <LanguageSelector value={language} onChange={handleLanguageChange} />
+            </div>
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden relative">
             <CodeMirror
               ref={editorRef}
               value={code}
               height="100%"
               theme={vscodeDark}
-              extensions={[
-                languageExtension,
-                highlightExtension(),
-                cursorTrackerExtension,
-              ]}
-              onChange={handleCodeChange}
+              extensions={editorExtensions}
+              onChange={editorMode === 'edit' ? handleCodeChange : undefined}
               basicSetup={{
                 lineNumbers: true,
-                highlightActiveLineGutter: true,
-                highlightActiveLine: true,
-                foldGutter: true,
-                dropCursor: true,
-                allowMultipleSelections: true,
-                indentOnInput: true,
-                bracketMatching: true,
-                closeBrackets: true,
-                autocompletion: true,
-                rectangularSelection: true,
+                highlightActiveLineGutter: editorMode === 'edit',
+                highlightActiveLine: editorMode === 'edit',
+                foldGutter: editorMode === 'edit',
+                dropCursor: editorMode === 'edit',
+                allowMultipleSelections: editorMode === 'edit',
+                indentOnInput: editorMode === 'edit',
+                bracketMatching: editorMode === 'edit',
+                closeBrackets: editorMode === 'edit',
+                autocompletion: editorMode === 'edit',
+                rectangularSelection: editorMode === 'edit',
                 crosshairCursor: false,
-                highlightSelectionMatches: true,
+                highlightSelectionMatches: editorMode === 'edit',
               }}
               style={{ height: '100%', fontSize: '14px' }}
             />

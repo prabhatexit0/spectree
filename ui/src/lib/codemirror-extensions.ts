@@ -99,6 +99,46 @@ export function setHighlight(view: EditorView, range: HighlightRange | null): vo
 }
 
 // ============================================
+// Explorer Mode Click Handler Extension
+// ============================================
+
+/**
+ * Creates an extension that handles click/tap events in explorer mode.
+ * When the editor is non-editable (explorer mode), this converts clicks
+ * into cursor position callbacks so AST nodes can be highlighted.
+ */
+export function explorerClickHandler(
+    onCursorChange: (position: CursorPosition) => void
+): Extension {
+    return EditorView.domEventHandlers({
+        mousedown(event, view) {
+            const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+            if (pos !== null) {
+                const line = view.state.doc.lineAt(pos);
+                onCursorChange({
+                    line: line.number - 1,
+                    column: pos - line.from,
+                    offset: pos,
+                });
+            }
+        },
+        touchend(event, view) {
+            const touch = event.changedTouches[0];
+            if (!touch) return;
+            const pos = view.posAtCoords({ x: touch.clientX, y: touch.clientY });
+            if (pos !== null) {
+                const line = view.state.doc.lineAt(pos);
+                onCursorChange({
+                    line: line.number - 1,
+                    column: pos - line.from,
+                    offset: pos,
+                });
+            }
+        },
+    });
+}
+
+// ============================================
 // Combined Extension Factory
 // ============================================
 
