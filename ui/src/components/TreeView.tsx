@@ -730,16 +730,17 @@ export function TreeView({
       const { x: sx, y: sy } = getCanvasCoords(e.clientX, e.clientY);
 
       if (dragRef.current?.active) {
-        const dx = sx - dragRef.current.startX;
-        const dy = sy - dragRef.current.startY;
+        const drag = dragRef.current;
+        const dx = sx - drag.startX;
+        const dy = sy - drag.startY;
         if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-          dragRef.current.moved = true;
+          drag.moved = true;
         }
-        setCamera((c) => ({
-          ...c,
-          x: dragRef.current!.startCamX + dx,
-          y: dragRef.current!.startCamY + dy,
-        }));
+        setCamera({
+          ...cameraRef.current,
+          x: drag.startCamX + dx,
+          y: drag.startCamY + dy,
+        });
         return;
       }
 
@@ -783,17 +784,29 @@ export function TreeView({
   );
 
   // ============================================
-  // Touch interactions (pan + pinch zoom)
+  // Touch + wheel via native listeners (passive: false to allow preventDefault)
   // ============================================
 
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
+  // Stable refs for callbacks that need access to latest values
+  const allNodesRef = useRef(allNodes);
+  allNodesRef.current = allNodes;
+  const onToggleNodeRef = useRef(onToggleNode);
+  onToggleNodeRef.current = onToggleNode;
+  const screenToWorldRef = useRef(screenToWorld);
+  screenToWorldRef.current = screenToWorld;
+  const getCanvasCoordsRef = useRef(getCanvasCoords);
+  getCanvasCoordsRef.current = getCanvasCoords;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
-        // Pinch start
         const t0 = e.touches[0];
         const t1 = e.touches[1];
         const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-        const mid = getCanvasCoords(
+        const mid = getCanvasCoordsRef.current(
           (t0.clientX + t1.clientX) / 2,
           (t0.clientY + t1.clientY) / 2,
         );
@@ -807,7 +820,7 @@ export function TreeView({
         dragRef.current = null;
       } else if (e.touches.length === 1) {
         const t = e.touches[0];
-        const { x, y } = getCanvasCoords(t.clientX, t.clientY);
+        const { x, y } = getCanvasCoordsRef.current(t.clientX, t.clientY);
         dragRef.current = {
           active: true,
           startX: x,
@@ -818,12 +831,9 @@ export function TreeView({
         };
         pinchRef.current = null;
       }
-    },
-    [getCanvasCoords]
-  );
+    };
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
+    const onTouchMove = (e: TouchEvent) => {
       e.preventDefault();
 
       if (e.touches.length === 2 && pinchRef.current?.active) {
@@ -833,7 +843,6 @@ export function TreeView({
         const scale = dist / pinchRef.current.initialDist;
         const newZoom = Math.min(3, Math.max(0.1, pinchRef.current.initialZoom * scale));
 
-        // Zoom toward pinch midpoint
         const mid = pinchRef.current;
         const worldX = (mid.midX - cameraRef.current.x) / cameraRef.current.zoom;
         const worldY = (mid.midY - cameraRef.current.y) / cameraRef.current.zoom;
@@ -844,58 +853,47 @@ export function TreeView({
           y: mid.midY - worldY * newZoom,
         });
       } else if (e.touches.length === 1 && dragRef.current?.active) {
+        const drag = dragRef.current;
         const t = e.touches[0];
-        const { x: sx, y: sy } = getCanvasCoords(t.clientX, t.clientY);
-        const dx = sx - dragRef.current.startX;
-        const dy = sy - dragRef.current.startY;
+        const { x: sx, y: sy } = getCanvasCoordsRef.current(t.clientX, t.clientY);
+        const dx = sx - drag.startX;
+        const dy = sy - drag.startY;
         if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-          dragRef.current.moved = true;
+          drag.moved = true;
         }
-        setCamera((c) => ({
-          ...c,
-          x: dragRef.current!.startCamX + dx,
-          y: dragRef.current!.startCamY + dy,
-        }));
+        setCamera({
+          ...cameraRef.current,
+          x: drag.startCamX + dx,
+          y: drag.startCamY + dy,
+        });
       }
-    },
-    [getCanvasCoords]
-  );
+    };
 
-  const handleTouchEnd = useCallback(
-    (e: React.TouchEvent) => {
+    const onTouchEnd = (e: TouchEvent) => {
       if (pinchRef.current?.active && e.touches.length < 2) {
         pinchRef.current = null;
       }
 
       if (dragRef.current && e.touches.length === 0) {
         if (!dragRef.current.moved) {
-          // Tap - check for node hit
-          const world = screenToWorld(dragRef.current.startX, dragRef.current.startY);
-          const hit = hitTest(allNodes, world.x, world.y);
+          const world = screenToWorldRef.current(dragRef.current.startX, dragRef.current.startY);
+          const hit = hitTest(allNodesRef.current, world.x, world.y);
           if (hit && hit.node.children.length > 0) {
-            onToggleNode(hit.id);
+            onToggleNodeRef.current(hit.id);
           }
         }
         dragRef.current = null;
       }
-    },
-    [screenToWorld, allNodes, onToggleNode]
-  );
+    };
 
-  // ============================================
-  // Scroll to zoom (mouse wheel)
-  // ============================================
-
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+    const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const { x: sx, y: sy } = getCanvasCoords(e.clientX, e.clientY);
+      const { x: sx, y: sy } = getCanvasCoordsRef.current(e.clientX, e.clientY);
       const cam = cameraRef.current;
 
       const factor = e.deltaY > 0 ? 0.9 : 1.1;
       const newZoom = Math.min(3, Math.max(0.1, cam.zoom * factor));
 
-      // Zoom toward cursor
       const worldX = (sx - cam.x) / cam.zoom;
       const worldY = (sy - cam.y) / cam.zoom;
 
@@ -904,17 +902,19 @@ export function TreeView({
         x: sx - worldX * newZoom,
         y: sy - worldY * newZoom,
       });
-    },
-    [getCanvasCoords]
-  );
+    };
 
-  // Prevent default on wheel at the DOM level to avoid passive listener issues
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const handler = (e: WheelEvent) => e.preventDefault();
-    canvas.addEventListener('wheel', handler, { passive: false });
-    return () => canvas.removeEventListener('wheel', handler);
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('wheel', onWheel);
+    };
   }, []);
 
   // ============================================
@@ -943,10 +943,6 @@ export function TreeView({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onWheel={handleWheel}
       />
       {/* Zoom controls overlay */}
       <div className="tree-view-controls">
