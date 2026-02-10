@@ -743,7 +743,7 @@ function App() {
             </div>
           }
         >
-          <div className={`flex-1 ${treeViewEnabled ? 'overflow-hidden' : 'overflow-auto px-1 py-1 hide-scrollbar ast-tree'}`}>
+          <div className={`flex-1 ${treeViewEnabled ? 'relative overflow-hidden' : 'overflow-auto px-1 py-1 hide-scrollbar ast-tree'}`}>
             {renderAstContent()}
           </div>
         </BottomSheet>
@@ -883,7 +883,7 @@ function App() {
               )}
             </div>
           </div>
-          <div className={`flex-1 ${treeViewEnabled ? 'overflow-hidden' : 'overflow-auto px-2 py-1 ast-tree'}`}>
+          <div className={`flex-1 ${treeViewEnabled ? 'relative overflow-hidden' : 'overflow-auto px-2 py-1 ast-tree'}`}>
             {renderAstContent()}
           </div>
         </div>

@@ -575,19 +575,22 @@ export function TreeView({
     };
   }, [ast, expandedNodes]);
 
-  // Auto-fit when tree changes significantly
-  const prevTreeSizeRef = useRef({ width: 0, height: 0 });
+  // Auto-fit only on first render or when the AST root changes (language switch)
+  // Not on every expand/collapse, which would be disorienting
+  const prevAstRootRef = useRef<string | null>(null);
+  const hasInitialFitRef = useRef(false);
 
   useEffect(() => {
     if (size.width === 0 || size.height === 0) return;
 
-    const prev = prevTreeSizeRef.current;
-    const significantChange =
-      Math.abs(treeBounds.width - prev.width) > 100 ||
-      Math.abs(treeBounds.height - prev.height) > 100;
+    const astRootKind = ast.kind + '|' + ast.children.length;
+    const isNewAst = prevAstRootRef.current !== null && prevAstRootRef.current !== astRootKind;
+    const needsInitialFit = !hasInitialFitRef.current;
 
-    if (significantChange || (prev.width === 0 && prev.height === 0)) {
-      // Fit the tree in view with padding
+    prevAstRootRef.current = astRootKind;
+
+    if (needsInitialFit || isNewAst) {
+      hasInitialFitRef.current = true;
       const pad = 60;
       const scaleX = (size.width - pad * 2) / Math.max(1, treeBounds.width);
       const scaleY = (size.height - pad * 2) / Math.max(1, treeBounds.height);
@@ -596,9 +599,8 @@ export function TreeView({
       const y = pad;
 
       setCamera({ x, y, zoom });
-      prevTreeSizeRef.current = { ...treeBounds };
     }
-  }, [treeBounds, size]);
+  }, [ast, treeBounds, size]);
 
   // Scroll to cursor node
   useEffect(() => {
