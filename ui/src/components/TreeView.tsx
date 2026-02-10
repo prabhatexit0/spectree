@@ -733,6 +733,7 @@ export function TreeView({
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
+      if (e.pointerType === 'touch') return; // handled by touch events
       const { x: sx, y: sy } = getCanvasCoords(e.clientX, e.clientY);
 
       if (dragRef.current?.active) {
@@ -772,6 +773,7 @@ export function TreeView({
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
+      if (e.pointerType === 'touch') return; // handled by touch events
       if (!dragRef.current) return;
 
       if (!dragRef.current.moved) {
