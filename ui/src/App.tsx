@@ -699,7 +699,7 @@ function App() {
                   </span>
                 )}
               </span>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                 {/* Tree View toggle (mobile) */}
                 <div className="flex items-center bg-white/[0.08] rounded-full p-[2px]">
                   <button

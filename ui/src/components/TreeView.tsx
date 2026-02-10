@@ -575,22 +575,26 @@ export function TreeView({
     };
   }, [ast, expandedNodes]);
 
-  // Auto-fit only on first render or when the AST root changes (language switch)
-  // Not on every expand/collapse, which would be disorienting
+  // Auto-fit on first render, when the AST root changes (language switch),
+  // or when the container size changes significantly (e.g. bottom sheet animation)
+  // but NOT on every expand/collapse, which would be disorienting
   const prevAstRootRef = useRef<string | null>(null);
-  const hasInitialFitRef = useRef(false);
+  const prevSizeRef = useRef({ width: 0, height: 0 });
 
   useEffect(() => {
     if (size.width === 0 || size.height === 0) return;
 
     const astRootKind = ast.kind + '|' + ast.children.length;
     const isNewAst = prevAstRootRef.current !== null && prevAstRootRef.current !== astRootKind;
-    const needsInitialFit = !hasInitialFitRef.current;
+    const isFirstRender = prevSizeRef.current.width === 0 && prevSizeRef.current.height === 0;
+    const sizeChangedSignificantly =
+      Math.abs(size.width - prevSizeRef.current.width) > 50 ||
+      Math.abs(size.height - prevSizeRef.current.height) > 50;
 
     prevAstRootRef.current = astRootKind;
+    prevSizeRef.current = { ...size };
 
-    if (needsInitialFit || isNewAst) {
-      hasInitialFitRef.current = true;
+    if (isFirstRender || isNewAst || sizeChangedSignificantly) {
       const pad = 60;
       const scaleX = (size.width - pad * 2) / Math.max(1, treeBounds.width);
       const scaleY = (size.height - pad * 2) / Math.max(1, treeBounds.height);
