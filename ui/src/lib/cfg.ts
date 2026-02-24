@@ -72,7 +72,6 @@ const FUNCTION_TYPES = new Set([
   'method_definition', 'method_declaration',
   'arrow_function', 'lambda', 'lambda_expression',
   'closure_expression',
-  'let_declaration', // OCaml `let .. in`
   'value_definition',
 ]);
 
@@ -82,7 +81,7 @@ const CONTAINER_TYPES = new Set([
   'block', 'statement_block', 'compound_statement',
   'declaration_list', 'field_declaration_list',
   'expression_statement', 'lexical_declaration',
-  'variable_declaration', 'short_var_declaration',
+  'variable_declaration', 'let_declaration', 'short_var_declaration',
   'assignment_statement', 'assignment_expression',
   'call_expression', 'module',
   ...Array.from(FUNCTION_TYPES),
