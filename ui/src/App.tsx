@@ -17,11 +17,14 @@ import {
   Pencil,
   GitBranch,
   List,
+  Network,
 } from 'lucide-react';
 import { parser, type AstNode, type ParseResult } from './lib/parser';
+import { buildCfg, type Cfg, type CfgBlock } from './lib/cfg';
 import { LanguageSelector } from './components/LanguageSelector';
 import { BottomSheet, type SnapPoint } from './components/BottomSheet';
 import { TreeView } from './components/TreeView';
+import { CfgView } from './components/CfgView';
 import { EditorView } from '@codemirror/view';
 import {
   cursorPositionTracker,
@@ -195,7 +198,9 @@ function App() {
   const [hoveredNodePath, setHoveredNodePath] = useState<string | null>(null);
   const [astSnap, setAstSnap] = useState<SnapPoint>('collapsed');
   const [editorMode, setEditorMode] = useState<EditorMode>('explorer');
-  const [treeViewEnabled, setTreeViewEnabled] = useState(false);
+  type ViewMode = 'list' | 'tree' | 'cfg';
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [hoveredCfgBlockId, setHoveredCfgBlockId] = useState<string | null>(null);
 
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const cursorDebounceRef = useRef<number | null>(null);
@@ -456,6 +461,43 @@ function App() {
     return exts;
   }, [editorMode, languageExtension, cursorTrackerExtension, explorerClickExtension]);
 
+  // Build CFG from AST + source code
+  const cfgResult = useMemo<Cfg | null>(() => {
+    if (!parseResult?.ast) return null;
+    return buildCfg(parseResult.ast, code);
+  }, [parseResult?.ast, code]);
+
+  // CFG block hover → highlight source range
+  const cfgBlockMap = useMemo(() => {
+    if (!cfgResult) return new Map<string, CfgBlock>();
+    const m = new Map<string, CfgBlock>();
+    for (const b of cfgResult.blocks) {
+      m.set(b.id, b);
+    }
+    return m;
+  }, [cfgResult]);
+
+  const handleCfgBlockHover = useCallback(
+    (blockId: string) => {
+      setHoveredCfgBlockId(blockId);
+      const block = cfgBlockMap.get(blockId);
+      if (block && editorRef.current?.view) {
+        setHighlight(editorRef.current.view, {
+          from: block.start,
+          to: block.end,
+        });
+      }
+    },
+    [cfgBlockMap],
+  );
+
+  const handleCfgBlockLeave = useCallback(() => {
+    setHoveredCfgBlockId(null);
+    if (editorRef.current?.view) {
+      setHighlight(editorRef.current.view, null);
+    }
+  }, []);
+
   // Toggle expand/collapse all nodes
   const toggleExpandCollapseAll = () => {
     if (isAllExpanded) {
@@ -581,7 +623,24 @@ function App() {
 
     if (parseResult) {
       if (parseResult.success && parseResult.ast) {
-        if (treeViewEnabled) {
+        if (viewMode === 'cfg') {
+          if (cfgResult && cfgResult.blocks.length > 0) {
+            return (
+              <CfgView
+                cfg={cfgResult}
+                hoveredBlockId={hoveredCfgBlockId}
+                onBlockHover={handleCfgBlockHover}
+                onBlockLeave={handleCfgBlockLeave}
+              />
+            );
+          }
+          return (
+            <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+              No control flow detected
+            </div>
+          );
+        }
+        if (viewMode === 'tree') {
           return (
             <TreeView
               ast={parseResult.ast}
@@ -700,12 +759,12 @@ function App() {
                 )}
               </span>
               <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                {/* Tree View toggle (mobile) */}
+                {/* View mode toggle (mobile) */}
                 <div className="flex items-center bg-white/[0.08] rounded-full p-[2px]">
                   <button
-                    onClick={() => setTreeViewEnabled(false)}
+                    onClick={() => setViewMode('list')}
                     className={`flex items-center justify-center w-6 h-6 rounded-full transition-all ${
-                      !treeViewEnabled
+                      viewMode === 'list'
                         ? 'bg-[#007acc] text-white shadow-sm shadow-blue-500/30'
                         : 'text-gray-500 active:bg-white/10'
                     }`}
@@ -714,9 +773,9 @@ function App() {
                     <List className="w-3 h-3" />
                   </button>
                   <button
-                    onClick={() => setTreeViewEnabled(true)}
+                    onClick={() => setViewMode('tree')}
                     className={`flex items-center justify-center w-6 h-6 rounded-full transition-all ${
-                      treeViewEnabled
+                      viewMode === 'tree'
                         ? 'bg-[#007acc] text-white shadow-sm shadow-blue-500/30'
                         : 'text-gray-500 active:bg-white/10'
                     }`}
@@ -724,9 +783,20 @@ function App() {
                   >
                     <GitBranch className="w-3 h-3" />
                   </button>
+                  <button
+                    onClick={() => setViewMode('cfg')}
+                    className={`flex items-center justify-center w-6 h-6 rounded-full transition-all ${
+                      viewMode === 'cfg'
+                        ? 'bg-[#007acc] text-white shadow-sm shadow-blue-500/30'
+                        : 'text-gray-500 active:bg-white/10'
+                    }`}
+                    aria-label="CFG view"
+                  >
+                    <Network className="w-3 h-3" />
+                  </button>
                 </div>
                 {/* Expand/Collapse all (only in list view) */}
-                {parseResult?.ast && !treeViewEnabled && (
+                {parseResult?.ast && viewMode === 'list' && (
                   <button
                     onClick={toggleExpandCollapseAll}
                     className="flex items-center justify-center w-7 h-7 rounded text-gray-500 active:bg-white/10 transition-colors"
@@ -743,7 +813,7 @@ function App() {
             </div>
           }
         >
-          <div className={`flex-1 ${treeViewEnabled ? 'relative overflow-hidden' : 'overflow-auto px-1 py-1 hide-scrollbar ast-tree'}`}>
+          <div className={`flex-1 ${viewMode !== 'list' ? 'relative overflow-hidden' : 'overflow-auto px-1 py-1 hide-scrollbar ast-tree'}`}>
             {renderAstContent()}
           </div>
         </BottomSheet>
@@ -834,12 +904,12 @@ function App() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              {/* Tree View toggle */}
+              {/* View mode toggle */}
               <div className="flex items-center bg-white/[0.08] rounded-full p-[3px]">
                 <button
-                  onClick={() => setTreeViewEnabled(false)}
+                  onClick={() => setViewMode('list')}
                   className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all ${
-                    !treeViewEnabled
+                    viewMode === 'list'
                       ? 'bg-[#007acc] text-white shadow-sm shadow-blue-500/30'
                       : 'text-gray-500 hover:text-gray-300 hover:bg-white/10'
                   }`}
@@ -849,9 +919,9 @@ function App() {
                   <span>List</span>
                 </button>
                 <button
-                  onClick={() => setTreeViewEnabled(true)}
+                  onClick={() => setViewMode('tree')}
                   className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all ${
-                    treeViewEnabled
+                    viewMode === 'tree'
                       ? 'bg-[#007acc] text-white shadow-sm shadow-blue-500/30'
                       : 'text-gray-500 hover:text-gray-300 hover:bg-white/10'
                   }`}
@@ -860,9 +930,21 @@ function App() {
                   <GitBranch className="w-3 h-3" />
                   <span>Tree</span>
                 </button>
+                <button
+                  onClick={() => setViewMode('cfg')}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all ${
+                    viewMode === 'cfg'
+                      ? 'bg-[#007acc] text-white shadow-sm shadow-blue-500/30'
+                      : 'text-gray-500 hover:text-gray-300 hover:bg-white/10'
+                  }`}
+                  aria-label="CFG view"
+                >
+                  <Network className="w-3 h-3" />
+                  <span>CFG</span>
+                </button>
               </div>
               {/* Expand/Collapse all (only in list view) */}
-              {parseResult?.ast && !treeViewEnabled && (
+              {parseResult?.ast && viewMode === 'list' && (
                 <button
                   onClick={toggleExpandCollapseAll}
                   className="flex items-center gap-1.5 text-xs px-1.5 py-1 rounded hover:bg-white/10 transition-colors text-gray-500 hover:text-gray-400"
@@ -883,7 +965,7 @@ function App() {
               )}
             </div>
           </div>
-          <div className={`flex-1 ${treeViewEnabled ? 'relative overflow-hidden' : 'overflow-auto px-2 py-1 ast-tree'}`}>
+          <div className={`flex-1 ${viewMode !== 'list' ? 'relative overflow-hidden' : 'overflow-auto px-2 py-1 ast-tree'}`}>
             {renderAstContent()}
           </div>
         </div>

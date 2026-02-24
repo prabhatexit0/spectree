@@ -342,3 +342,43 @@ body {
     left: 12px;
   }
 }
+
+/* ============================================
+   CFG View (Control Flow Graph)
+   ============================================ */
+
+.cfg-view-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-color: #1a1a1a;
+  background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.03) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+}
+
+.cfg-view-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.cfg-view-canvas:active {
+  cursor: grabbing;
+}
+
+.cfg-block-count {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 11px;
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  color: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+  z-index: 10;
+}

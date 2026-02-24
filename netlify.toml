@@ -1,0 +1,32 @@
+[build]
+  base = "ui/"
+  command = "npm install && npm run download-parsers && npm run build"
+  publish = "dist/"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback — serve index.html for all routes
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Cache WASM files aggressively (they're content-addressed by the build)
+[[headers]]
+  for = "/*.wasm"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+    Content-Type = "application/wasm"
+
+[[headers]]
+  for = "/parsers/*.wasm"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+    Content-Type = "application/wasm"
+
+# Cache hashed assets from Vite
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
